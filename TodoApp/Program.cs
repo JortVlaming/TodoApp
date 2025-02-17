@@ -4,7 +4,7 @@
     {
         public static void Main(string[] args)
         {
-            new TodoApp().run(args);
+            new TodoApp().Run(args);
         }
     }
 }

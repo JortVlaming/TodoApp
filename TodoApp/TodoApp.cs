@@ -1,10 +1,14 @@
+using System.Text;
+using System.Text.Json;
+
 namespace TodoApp;
 
 public class TodoApp
 {
-    string todoDirectory = "";
-    
-    public void run(string[] args)
+    private string _todoDirectory = "";
+    private string _homeTodoListDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.todo";
+
+    public void Run(string[] args)
     {
         string currentDirectory = Directory.GetCurrentDirectory();
 
@@ -23,11 +27,11 @@ public class TodoApp
 
         if (Directory.Exists(currentDirectory + "/.todo"))
         {
-            todoDirectory = currentDirectory + "/.todo";
+            _todoDirectory = currentDirectory + "/.todo";
         }
         else
         {
-            todoDirectory = "";
+            _todoDirectory = "";
         }
         
         ChooseTodoMenu();
@@ -36,11 +40,10 @@ public class TodoApp
     private void ChooseTodoMenu()
     {
         int optionIndex = 0;
-        string homeTodoListDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.todo";
         
         while (true)
         {
-            bool todoExists = todoDirectory != "";
+            bool todoExists = _todoDirectory != "";
 
             Console.Clear();
             Console.SetCursorPosition(0, Console.CursorTop);
@@ -53,7 +56,7 @@ public class TodoApp
             if (todoExists)
             {
                 Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + "Pretend like this shows todo list information");
-                options.Insert(nextOptionIndex, "use:" + todoDirectory);
+                options.Insert(nextOptionIndex, "use:" + _todoDirectory);
             }
             else
             {
@@ -68,11 +71,11 @@ public class TodoApp
     
             nextOptionIndex++;
             
-            if (Directory.Exists(homeTodoListDir))
+            if (Directory.Exists(_homeTodoListDir))
             {
                 Console.WriteLine("");
                 Console.WriteLine("Global lists");
-                string[] globals = Directory.GetDirectories(homeTodoListDir);
+                string[] globals = Directory.GetDirectories(_homeTodoListDir);
                 if (globals.Length == 0)
                 {
                     Console.WriteLine("No global lists!");
@@ -97,12 +100,100 @@ public class TodoApp
             ConsoleKeyInfo key = Console.ReadKey();
             if (key.Key == ConsoleKey.UpArrow)
             {
-                if (optionIndex > 1) optionIndex--;
+                if (optionIndex > 0) optionIndex--;
             }
             else if (key.Key == ConsoleKey.DownArrow)
             {
                 if (optionIndex < nextOptionIndex) optionIndex++;
             }
+            else if (key.Key == ConsoleKey.Enter)
+            {
+                string choice = options[optionIndex];
+                string[] split = choice.Split(":");
+                string operation = split[0];
+                string arg = split[1];
+                if (operation == "create")
+                {
+                    if (arg == "global")
+                    {
+                        CreateGlobalLists();
+                    }
+                    else
+                    {
+                        CreateListInDirectory(arg);
+                    }
+                }
+                else if (operation == "user")
+                {
+                    
+                }
+                break;
+            }
         }
+    }
+    
+    private void CreateGlobalLists()
+    { 
+        Console.Clear();
+        Console.SetCursorPosition(0, Console.CursorTop);
+        Console.WriteLine("Creating global todo list");
+        Console.WriteLine("");
+        Console.Write("Todo list name: ");
+        string name = "";
+
+        while (name == "")
+        {
+            string? input = Console.ReadLine();
+            if (input == null)
+            {
+                Console.WriteLine("Please enter a name");
+                Console.Write("Todo list name: ");
+                continue;
+            }
+
+            if (input.Trim() == "")
+            {
+                Console.WriteLine("Please enter a name");
+                Console.Write("Todo list name: ");
+                continue;
+            }
+
+            if (Directory.Exists(_homeTodoListDir + "/" + input))
+            {
+                Console.WriteLine($"Todo list '{input}' already exists");
+                Console.Write("Todo list name: ");
+                continue;
+            }
+            
+            name = input;
+        }
+
+        string todoListDirectory = _homeTodoListDir + "/" + name.Replace(" ", "_");
+
+        Directory.CreateDirectory(todoListDirectory);
+
+        FileStream configStream = File.Create(todoListDirectory + "/CONFIG.json");
+
+        TodoList list = new TodoList();
+        list.Name = name;
+
+        string json = JsonSerializer.Serialize(list);
+        WriteStringToFileStream(configStream, json);
+        
+        configStream.Close();
+        
+        Console.WriteLine($"Created todo list: '{name}'");
+    }
+
+    private void CreateListInDirectory(string path)
+    {
+        Console.WriteLine("Creating list in directory: " + path);
+    }
+
+    private void WriteStringToFileStream(FileStream fileStream, string content)
+    {
+        byte[] info = new UTF8Encoding(true).GetBytes(content);
+        fileStream.Write(info, 0, info.Length);
+        fileStream.Flush();
     }
 }
