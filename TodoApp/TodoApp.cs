@@ -5,8 +5,14 @@ namespace TodoApp;
 
 public class TodoApp
 {
-    private string _todoDirectory = "";
-    private string _homeTodoListDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.todo";
+    private string _localTodoDirectory;
+    private readonly string _homeTodoListDir;
+
+    public TodoApp()
+    {
+        _localTodoDirectory = "";
+        _homeTodoListDir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "/.todo";
+    }
 
     public void Run(string[] args)
     {
@@ -25,14 +31,16 @@ public class TodoApp
             currentDirectory = directory;
         }
 
-        if (Directory.Exists(currentDirectory + "/.todo"))
+        if (args.Contains("-debug"))
         {
-            _todoDirectory = currentDirectory + "/.todo";
+            Thread.Sleep(5000);
         }
-        else
+
+        if (!Directory.Exists(currentDirectory + "/.todo"))
         {
-            _todoDirectory = "";
+            Directory.CreateDirectory(currentDirectory + "/.todo");
         }
+        _localTodoDirectory = currentDirectory + "/.todo";
         
         ChooseTodoMenu();
     }
@@ -43,8 +51,6 @@ public class TodoApp
         
         while (true)
         {
-            bool todoExists = _todoDirectory != "";
-
             Console.Clear();
             Console.SetCursorPosition(0, Console.CursorTop);
             Console.WriteLine("Todo list app");
@@ -52,20 +58,29 @@ public class TodoApp
             int nextOptionIndex = 0;
 
             List<string> options = new List<string>();
-
-            if (todoExists)
+            
+            Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + "Create local todo list");
+            options.Insert(nextOptionIndex, "create:local");
+            nextOptionIndex++;
+            
+            Console.WriteLine("");
+            Console.WriteLine("Local lists");
+            string[] locals = Directory.GetDirectories(_localTodoDirectory);
+            if (locals.Length == 0)
             {
-                Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + "Pretend like this shows todo list information");
-                options.Insert(nextOptionIndex, "use:" + _todoDirectory);
+                Console.WriteLine("No local lists!");
             }
             else
             {
-                Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + "Create todo list in current directory (" + Directory.GetCurrentDirectory() + ")");
-                options.Insert(nextOptionIndex, "create:" + Directory.GetCurrentDirectory());
+                foreach (string list in locals)
+                {
+                    Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + list);
+                    options.Insert(nextOptionIndex, "use:local:" + list);
+                    nextOptionIndex++;
+                }
             }
             
-            nextOptionIndex++;
-            
+            Console.WriteLine("");
             Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + "Create global todo list");
             options.Insert(nextOptionIndex, "create:global");
     
@@ -84,8 +99,8 @@ public class TodoApp
                 {
                     foreach (string path in globals)
                     {
-                        Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + path);
-                        options.Insert(nextOptionIndex, "use:" + path);
+                        Console.WriteLine((optionIndex == nextOptionIndex ? "> " : "") + path.Replace("_", " "));
+                        options.Insert(nextOptionIndex, "use:global:" + path);
                         nextOptionIndex++;
                     }
                 }
@@ -94,8 +109,6 @@ public class TodoApp
             // make choice stuff
             nextOptionIndex--;
             if (optionIndex > nextOptionIndex) optionIndex = nextOptionIndex-1;
-            
-            Console.WriteLine($"{optionIndex} : {nextOptionIndex}");
             
             ConsoleKeyInfo key = Console.ReadKey();
             if (key.Key == ConsoleKey.UpArrow)
@@ -116,11 +129,15 @@ public class TodoApp
                 {
                     if (arg == "global")
                     {
-                        CreateGlobalLists();
+                        CreateList(_homeTodoListDir);
+                    }
+                    else if (arg == "local")
+                    {
+                        CreateList(_localTodoDirectory);
                     }
                     else
                     {
-                        CreateListInDirectory(arg);
+                        throw new ArgumentException($"Invalid create operation {arg} : {choice} : {optionIndex}");
                     }
                 }
                 else if (operation == "user")
@@ -132,7 +149,7 @@ public class TodoApp
         }
     }
     
-    private void CreateGlobalLists()
+    private void CreateList(string basePath)
     { 
         Console.Clear();
         Console.SetCursorPosition(0, Console.CursorTop);
@@ -158,7 +175,7 @@ public class TodoApp
                 continue;
             }
 
-            if (Directory.Exists(_homeTodoListDir + "/" + input))
+            if (Directory.Exists(basePath + "/" + input))
             {
                 Console.WriteLine($"Todo list '{input}' already exists");
                 Console.Write("Todo list name: ");
@@ -168,7 +185,7 @@ public class TodoApp
             name = input;
         }
 
-        string todoListDirectory = _homeTodoListDir + "/" + name.Replace(" ", "_");
+        string todoListDirectory = basePath + "/" + name.Replace(" ", "_");
 
         Directory.CreateDirectory(todoListDirectory);
 
@@ -183,11 +200,9 @@ public class TodoApp
         configStream.Close();
         
         Console.WriteLine($"Created todo list: '{name}'");
-    }
-
-    private void CreateListInDirectory(string path)
-    {
-        Console.WriteLine("Creating list in directory: " + path);
+        
+        Thread.Sleep(1000);
+        ChooseTodoMenu();
     }
 
     private void WriteStringToFileStream(FileStream fileStream, string content)
